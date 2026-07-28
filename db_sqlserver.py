@@ -3,8 +3,8 @@ from shift_engine import DEFAULT_SHIFTS
 
 SERVER_NAME = r".\SQLEXPRESS"
 DB_NAME = "HR_Management"
-CONN_STR_MASTER = f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={SERVER_NAME};DATABASE=master;Trusted_Connection=yes;Encrypt=no;TrustServerCertificate=yes;Connection Timeout=5;"
-CONN_STR_APP = f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={SERVER_NAME};DATABASE={DB_NAME};Trusted_Connection=yes;Encrypt=no;TrustServerCertificate=yes;Connection Timeout=5;"
+CONN_STR_MASTER = f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={SERVER_NAME};DATABASE=master;Trusted_Connection=yes;Encrypt=no;TrustServerCertificate=yes;"
+CONN_STR_APP = f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={SERVER_NAME};DATABASE={DB_NAME};Trusted_Connection=yes;Encrypt=no;TrustServerCertificate=yes;"
 
 
 
@@ -502,6 +502,60 @@ def delete_leave_sql(leave_id):
     return True
 
 
+def recalculate_attendance_for_shift_sql(target_shift_id=None):
+    from shift_engine import calculate_punch_status, DEFAULT_SHIFTS
+    conn = get_connection(use_app_db=True)
+    if not conn:
+        return False
+    try:
+        cursor = conn.cursor()
+
+        # Fetch employees
+        cursor.execute("SELECT id, shift_id FROM Employees")
+        emp_shifts = {str(row[0]).strip(): (row[1] or 'S5') for row in cursor.fetchall()}
+
+        # Fetch shifts
+        cursor.execute("SELECT id, name, start_time, end_time, grace_minutes FROM Shifts")
+        shifts = {}
+        for row in cursor.fetchall():
+            shifts[row[0]] = {
+                "id": row[0],
+                "name": row[1],
+                "start_time": row[2],
+                "end_time": row[3],
+                "grace_minutes": row[4]
+            }
+
+        # Fetch attendance records
+        if target_shift_id:
+            cursor.execute("SELECT id, emp_id, check_in, check_out, shift_id FROM Attendance WHERE shift_id = ?", (target_shift_id,))
+        else:
+            cursor.execute("SELECT id, emp_id, check_in, check_out, shift_id FROM Attendance")
+
+        att_rows = cursor.fetchall()
+        for row in att_rows:
+            att_id, emp_id, cin, cout, cur_s_id = row[0], str(row[1]).strip(), row[2], row[3], row[4]
+            emp_s_id = emp_shifts.get(emp_id, cur_s_id)
+            shift = shifts.get(emp_s_id, shifts.get(cur_s_id, DEFAULT_SHIFTS.get('S5')))
+
+            if shift and cin and cin != '--:--':
+                res = calculate_punch_status(shift, cin, cout)
+                cursor.execute("""
+                    UPDATE Attendance 
+                    SET shift_name=?, shift_id=?, status=?, late_minutes=?, early_minutes=?, hours_worked=?, penalty_days=?, remarks=? 
+                    WHERE id=?
+                """, (
+                    shift['name'], shift['id'], res['status'], res['late_minutes'], res['early_minutes'], res['hours_worked'], res['penalty_days'], res['remarks'], att_id
+                ))
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Recalculate error: {e}")
+        if conn:
+            conn.close()
+        return False
+
+
 def save_shift_sql(shift_obj):
     conn = get_connection(use_app_db=True)
     if not conn:
@@ -524,6 +578,9 @@ def save_shift_sql(shift_obj):
         s_id, name, start_time, end_time, grace_minutes
     ))
     conn.close()
+
+    # Automatically recalculate existing attendance logs for this shift
+    recalculate_attendance_for_shift_sql(s_id)
     return True
 
 

@@ -412,6 +412,22 @@ tr:hover td {
   box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
 }
 
+input[type="month"].input-field, input[type="date"].input-field {
+  color-scheme: dark;
+  cursor: pointer;
+}
+
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
 /* Modal */
 .modal-overlay {
   position: fixed;

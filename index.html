@@ -92,7 +92,14 @@
             <div class="stat-icon stat-blue"><i class="fa-solid fa-users"></i></div>
             <div>
               <div class="stat-val" id="stat-total-emp">0</div>
-              <div class="stat-lbl">Total Employees</div>
+              <div class="stat-lbl">Total Registered</div>
+            </div>
+          </div>
+          <div class="glass-card stat-box">
+            <div class="stat-icon stat-blue" style="background: rgba(99, 102, 241, 0.2); color: #818cf8;"><i class="fa-solid fa-user-gear"></i></div>
+            <div>
+              <div class="stat-val" id="stat-active-emp">0</div>
+              <div class="stat-lbl">Active Employees</div>
             </div>
           </div>
           <div class="glass-card stat-box">
@@ -103,7 +110,7 @@
             </div>
           </div>
           <div class="glass-card stat-box">
-            <div class="stat-icon stat-yellow"><i class="fa-solid fa-clock-pulse"></i></div>
+            <div class="stat-icon stat-yellow"><i class="fa-solid fa-user-clock"></i></div>
             <div>
               <div class="stat-val" id="stat-late-cuts">0</div>
               <div class="stat-lbl">Late / Shift Cuts</div>
@@ -119,9 +126,15 @@
         </div>
 
         <div class="glass-card" style="margin-bottom:28px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h3 style="font-size:16px;"><i class="fa-solid fa-list-check"></i> Today's Live Attendance Feed</h3>
-            <button class="btn btn-primary" onclick="openManualPunchModal()"><i class="fa-solid fa-plus"></i> Manual Punch</button>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+            <h3 style="font-size:16px; margin:0;"><i class="fa-solid fa-list-check"></i> Today's Live Attendance Feed</h3>
+            <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+              <div style="position:relative; display:inline-flex; align-items:center; width:240px;">
+                <input type="text" id="dashboard-search-input" class="input-field" placeholder="Search name, ID, shift..." style="padding-left:34px; height:36px; font-size:13px;" oninput="renderDashboard()">
+                <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:12px; color:var(--text-muted); font-size:13px; pointer-events:none;"></i>
+              </div>
+              <button class="btn btn-primary" onclick="openManualPunchModal()"><i class="fa-solid fa-plus"></i> Manual Punch</button>
+            </div>
           </div>
           <div class="table-container">
             <table>
@@ -167,9 +180,15 @@
       <!-- TAB 3: Employees & Shifts -->
       <div id="tab-employees" class="tab-page" style="display:none;">
         <div class="glass-card" style="margin-bottom:28px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h3><i class="fa-solid fa-clock"></i> Active Work Shifts</h3>
-            <button class="btn btn-secondary" onclick="openShiftModal()"><i class="fa-solid fa-plus"></i> Create Custom Shift</button>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+            <h3 style="margin:0;"><i class="fa-solid fa-clock"></i> Active Work Shifts</h3>
+            <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+              <div style="position:relative; display:inline-flex; align-items:center; width:220px;">
+                <input type="text" id="shift-search-input" class="input-field" placeholder="Search shift name, ID..." style="padding-left:34px; height:36px; font-size:13px;" oninput="renderShifts()">
+                <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:12px; color:var(--text-muted); font-size:13px; pointer-events:none;"></i>
+              </div>
+              <button class="btn btn-secondary" onclick="openShiftModal()"><i class="fa-solid fa-plus"></i> Create Custom Shift</button>
+            </div>
           </div>
           <div class="table-container">
             <table>
@@ -191,9 +210,13 @@
 
         <div class="glass-card">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
-            <h3><i class="fa-solid fa-users"></i> Employee Directory & Assigned Shifts</h3>
-            <div style="display:flex; gap:10px; align-items:center;">
-              <select id="employee-status-filter" class="input-field" style="width:160px; padding:6px 12px; font-size:13px;" onchange="renderEmployees()">
+            <h3 style="margin:0;"><i class="fa-solid fa-users"></i> Employee Directory & Assigned Shifts</h3>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <div style="position:relative; display:inline-flex; align-items:center; width:220px;">
+                <input type="text" id="employee-search-input" class="input-field" placeholder="Search name, ID, dept..." style="padding-left:34px; height:36px; font-size:13px;" oninput="renderEmployees()">
+                <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:12px; color:var(--text-muted); font-size:13px; pointer-events:none;"></i>
+              </div>
+              <select id="employee-status-filter" class="input-field" style="width:140px; padding:6px 12px; font-size:13px; height:36px;" onchange="renderEmployees()">
                 <option value="All">All Statuses</option>
                 <option value="Active" selected>Active Only</option>
                 <option value="Inactive">Inactive Only</option>
@@ -225,9 +248,15 @@
       <!-- TAB 4: Leave Manager -->
       <div id="tab-leaves" class="tab-page" style="display:none;">
         <div class="glass-card">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h3><i class="fa-solid fa-calendar-minus"></i> Leave Applications (Full / Half / Quarter)</h3>
-            <button class="btn btn-primary" onclick="openLeaveModal()"><i class="fa-solid fa-plus"></i> Apply Leave</button>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+            <h3 style="margin:0;"><i class="fa-solid fa-calendar-minus"></i> Leave Applications (Full / Half / Quarter)</h3>
+            <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+              <div style="position:relative; display:inline-flex; align-items:center; width:240px;">
+                <input type="text" id="leave-search-input" class="input-field" placeholder="Search leave name, type..." style="padding-left:34px; height:36px; font-size:13px;" oninput="renderLeaves()">
+                <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:12px; color:var(--text-muted); font-size:13px; pointer-events:none;"></i>
+              </div>
+              <button class="btn btn-primary" onclick="openLeaveModal()"><i class="fa-solid fa-plus"></i> Apply Leave</button>
+            </div>
           </div>
           <div class="table-container">
             <table>
@@ -254,38 +283,35 @@
       <!-- TAB 5: Monthly History -->
       <div id="tab-history" class="tab-page" style="display:none;">
         <div class="glass-card" style="margin-bottom:24px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
             <div>
-              <h3 style="margin-bottom:4px;"><i class="fa-solid fa-calendar-days"></i> Biometric Attendance Calendar View</h3>
-              <div style="font-size:13px; color:var(--text-muted);">Select any date on the calendar or date picker to view clean daily logs</div>
+              <h3 style="margin-bottom:4px;"><i class="fa-solid fa-calendar-days"></i> Monthly Biometric Attendance History</h3>
+              <div style="font-size:13px; color:var(--text-muted);">Select any date or month using the date picker below to view clean daily logs</div>
             </div>
             <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
               <div style="display:flex; gap:6px; align-items:center;">
-                <label style="font-size:13px; color:var(--text-muted);">Month:</label>
-                <input type="month" id="history-month-picker" class="input-field" style="width: auto;" onchange="renderHistoryCalendar()">
-              </div>
-              <div style="display:flex; gap:6px; align-items:center;">
                 <label style="font-size:13px; color:var(--text-muted);">Date:</label>
-                <input type="date" id="history-date-picker" class="input-field" style="width: auto;" onchange="selectHistoryDate(this.value)">
+                <div style="position:relative; display:inline-flex; align-items:center;">
+                  <input type="date" id="history-date-picker" class="input-field" style="width: 160px; cursor:pointer; padding-right:32px;" onchange="selectHistoryDate(this.value)" onclick="try{this.showPicker();}catch(e){}">
+                  <i class="fa-solid fa-calendar-day" style="position:absolute; right:10px; pointer-events:none; color:var(--primary); font-size:14px;"></i>
+                </div>
               </div>
               <button class="btn btn-secondary" style="padding: 8px 14px; font-size:12px;" onclick="jumpToTodayHistory()"><i class="fa-solid fa-calendar-day"></i> Today</button>
             </div>
-          </div>
-
-          <!-- Calendar Grid Widget -->
-          <div class="calendar-wrapper">
-            <div class="calendar-header-grid">
-              <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
-            </div>
-            <div class="calendar-days-grid" id="calendar-days-container"></div>
           </div>
         </div>
 
         <!-- Filtered Day Log Feed -->
         <div class="glass-card">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
-            <h4 id="history-selected-date-header" style="font-size:16px; color:var(--text-main);"><i class="fa-solid fa-clock"></i> Attendance Logs</h4>
-            <div id="history-day-summary-badge" style="font-size:13px; font-weight:600; color:var(--accent-purple);"></div>
+            <h4 id="history-selected-date-header" style="font-size:16px; color:var(--text-main); margin:0;"><i class="fa-solid fa-clock"></i> Attendance Logs</h4>
+            <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+              <div style="position:relative; display:inline-flex; align-items:center; width:240px;">
+                <input type="text" id="history-search-input" class="input-field" placeholder="Search daily logs..." style="padding-left:34px; height:36px; font-size:13px;" oninput="renderHistoryLogsTable()">
+                <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:12px; color:var(--text-muted); font-size:13px; pointer-events:none;"></i>
+              </div>
+              <div id="history-day-summary-badge" style="font-size:13px; font-weight:600; color:var(--accent-purple);"></div>
+            </div>
           </div>
           <div class="table-container">
             <table>
@@ -311,14 +337,21 @@
       <!-- TAB 6: Payroll & Salary Cuts -->
       <div id="tab-payroll" class="tab-page" style="display:none;">
         <div class="glass-card">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h3><i class="fa-solid fa-calculator"></i> Monthly Payroll & Automated Deductions</h3>
-            <div style="display:flex; gap:12px; align-items:center;">
-              <select id="payroll-status-filter" class="input-field" style="width:auto;" onchange="fetchPayroll()">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+            <h3 style="margin:0;"><i class="fa-solid fa-calculator"></i> Monthly Payroll & Automated Deductions</h3>
+            <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+              <div style="position:relative; display:inline-flex; align-items:center; width:220px;">
+                <input type="text" id="payroll-search-input" class="input-field" placeholder="Search employee payroll..." style="padding-left:34px; height:36px; font-size:13px;" oninput="renderPayrollTable()">
+                <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:12px; color:var(--text-muted); font-size:13px; pointer-events:none;"></i>
+              </div>
+              <select id="payroll-status-filter" class="input-field" style="width:auto; height:36px; font-size:13px;" onchange="fetchPayroll()">
                 <option value="Active">Active Only</option>
                 <option value="All">All Statuses (Active + Inactive)</option>
               </select>
-              <input type="month" id="payroll-month-picker" class="input-field" style="width: auto;" onchange="fetchPayroll()">
+              <div style="position:relative; display:inline-flex; align-items:center;">
+                <input type="month" id="payroll-month-picker" class="input-field" style="width: 165px; cursor:pointer; padding-right:34px; height:36px;" onchange="fetchPayroll()" onclick="try{this.showPicker();}catch(e){}">
+                <i class="fa-solid fa-calendar-days" style="position:absolute; right:12px; pointer-events:none; color:var(--primary); font-size:15px;"></i>
+              </div>
               <button class="btn btn-secondary" style="background:#10b981; color:#fff; font-weight:600;" onclick="exportPayrollExcel()"><i class="fa-solid fa-file-excel"></i> Export Payroll (Excel)</button>
               <button class="btn btn-primary" onclick="openPayslipModalAll()"><i class="fa-solid fa-file-invoice-dollar"></i> Generate All Payslips</button>
             </div>

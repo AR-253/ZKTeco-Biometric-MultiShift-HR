@@ -143,17 +143,17 @@ def calculate_punch_status(shift, check_in_str, check_out_str):
         early_minutes = max(0, end_mins - out_mins)
 
     shift_duration_mins = max(60, end_mins - start_mins)
+    half_shift_mins = shift_duration_mins / 2.0
+    three_quarter_mins = (3 * shift_duration_mins) / 4.0
     quarter_mins = shift_duration_mins / 4.0
 
-    # Late arrival penalty tier (Shift Hours / 4 = 1 Quarter)
+    # Late arrival penalty tier (User Rule: Late up to Half Shift = Quarter Cut 0.25)
     if late_minutes <= grace:
         late_penalty = 0.0
-    elif late_minutes <= quarter_mins:
+    elif late_minutes <= half_shift_mins:
         late_penalty = 0.25
-    elif late_minutes <= (2 * quarter_mins):
+    elif late_minutes <= three_quarter_mins:
         late_penalty = 0.50
-    elif late_minutes <= (3 * quarter_mins):
-        late_penalty = 0.75
     else:
         late_penalty = 1.0
 
@@ -162,12 +162,10 @@ def calculate_punch_status(shift, check_in_str, check_out_str):
     if out_t:
         if hours_worked >= (shift_duration_mins / 60.0 - 0.25):
             early_penalty = 0.0
-        elif hours_worked >= (3 * quarter_mins / 60.0):
+        elif hours_worked >= (half_shift_mins / 60.0):
             early_penalty = 0.25
-        elif hours_worked >= (2 * quarter_mins / 60.0):
-            early_penalty = 0.50
         elif hours_worked >= (quarter_mins / 60.0):
-            early_penalty = 0.75
+            early_penalty = 0.50
         else:
             early_penalty = 1.0
 

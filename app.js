@@ -12,6 +12,26 @@ let appState = {
 document.addEventListener('DOMContentLoaded', () => {
   startLiveClock();
 
+  // Instant 0ms UI Hydration from Local Storage Cache (Prevents data flash/disappearance on refresh)
+  const cachedStr = localStorage.getItem('cached_app_state');
+  if (cachedStr) {
+    try {
+      const cached = JSON.parse(cachedStr);
+      if (cached && (cached.employees || cached.attendance)) {
+        appState = { ...appState, ...cached };
+        renderDashboard();
+        renderEmployees();
+        renderLeaves();
+        renderHistory();
+        if (appState.currentPayroll && appState.currentPayroll.length > 0) {
+          renderPayrollTable(appState.currentPayroll);
+        }
+      }
+    } catch (e) {
+      console.warn('Cache hydration skipped:', e);
+    }
+  }
+
   // Restore active tab across page refreshes
   const savedTab = localStorage.getItem('activeTab');
   if (savedTab && document.getElementById(`tab-${savedTab}`)) {
@@ -72,9 +92,11 @@ document.addEventListener('DOMContentLoaded', () => {
 // Live ZKTeco Machine Sync
 async function syncZKTecoMachine() {
   const btn = document.querySelector('button[onclick="syncZKTecoMachine()"]');
-  const originalText = btn.innerHTML;
-  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Syncing ZKTeco...`;
-  btn.disabled = true;
+  const originalText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Syncing ZKTeco...`;
+    btn.disabled = true;
+  }
 
   try {
     const res = await fetch(`${API_BASE}/zkteco/sync`, {
@@ -82,18 +104,25 @@ async function syncZKTecoMachine() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ip: '192.168.18.25', port: 4370 })
     });
-    const result = await res.json();
+    const result = await res.json().catch(() => ({ success: false, message: 'Server returned non-JSON response.' }));
+    
     if (res.ok && result.success) {
-      alert(`ZKTeco Sync Complete!\n${result.message}`);
-      await fetchInitialData();
+      // Re-fetch UI data after 3s background hardware read
+      setTimeout(async () => {
+        await fetchInitialData();
+      }, 3000);
+      alert(`ZKTeco Biometric Sync Started!\n\n${result.message}`);
     } else {
-      alert(`ZKTeco Sync Error: ${result.error || 'Failed to connect to machine.'}`);
+      alert(`ZKTeco Sync Status: ${result.error || result.message || 'Sync initiated.'}`);
     }
   } catch (err) {
-    alert(`ZKTeco Sync Failed: ${err.message}`);
+    console.error('Sync error:', err);
+    alert(`ZKTeco Sync Notice: ${err.message}`);
   } finally {
-    btn.innerHTML = originalText;
-    btn.disabled = false;
+    if (btn) {
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+    }
   }
 }
 
@@ -136,7 +165,12 @@ function startLiveClock() {
 async function fetchInitialData() {
   try {
     const res = await fetch(`${API_BASE}/data`);
-    appState = await res.json();
+    const freshData = await res.json();
+    appState = { ...appState, ...freshData };
+
+    try {
+      localStorage.setItem('cached_app_state', JSON.stringify(appState));
+    } catch (e) {}
 
     renderDashboard();
     renderEmployees();
@@ -177,29 +211,51 @@ function switchTab(tabName) {
 
 // Render Dashboard
 function renderDashboard() {
-  document.getElementById('stat-total-emp').textContent = appState.employees.length;
+  const totalEmps = appState.employees.length;
+  const activeEmps = appState.employees.filter(e => (e.status || 'Active') === 'Active');
+  const activeEmpIds = new Set(activeEmps.map(e => String(e.id)));
+  const activeCount = activeEmps.length;
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const todayAtt = appState.attendance.filter(a => a.date === todayStr);
+  // Filter today's punches strictly for ACTIVE employees
+  const todayAtt = appState.attendance.filter(a => a.date === todayStr && activeEmpIds.has(String(a.emp_id)));
 
   const onTime = todayAtt.filter(a => a.status === 'On Time').length;
   const cuts = todayAtt.filter(a => ['Quarter Cut', 'Half Cut', 'Full Cut'].includes(a.status)).length;
-  const totalIn = todayAtt.length;
-  const absent = Math.max(0, appState.employees.length - totalIn);
+  const totalActiveIn = todayAtt.length;
 
-  document.getElementById('stat-ontime').textContent = onTime;
-  document.getElementById('stat-late-cuts').textContent = cuts;
-  document.getElementById('stat-absent').textContent = absent;
+  // Absent is calculated strictly out of ACTIVE employees
+  const absent = Math.max(0, activeCount - totalActiveIn);
+
+  if (document.getElementById('stat-total-emp')) document.getElementById('stat-total-emp').textContent = totalEmps;
+  if (document.getElementById('stat-active-emp')) document.getElementById('stat-active-emp').textContent = activeCount;
+  if (document.getElementById('stat-ontime')) document.getElementById('stat-ontime').textContent = onTime;
+  if (document.getElementById('stat-late-cuts')) document.getElementById('stat-late-cuts').textContent = cuts;
+  if (document.getElementById('stat-absent')) document.getElementById('stat-absent').textContent = absent;
 
   const tbody = document.getElementById('live-attendance-tbody');
   tbody.innerHTML = '';
 
-  if (todayAtt.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:24px;">No biometric attendance recorded for today yet. Upload an Excel log file or add a manual punch!</td></tr>`;
+  const searchQ = (document.getElementById('dashboard-search-input')?.value || '').toLowerCase().trim();
+  let filteredTodayAtt = todayAtt;
+  if (searchQ) {
+    filteredTodayAtt = todayAtt.filter(a => {
+      const emp = appState.employees.find(e => String(e.id) === String(a.emp_id));
+      const name = (emp ? emp.name : a.emp_name || '').toLowerCase();
+      const id = String(a.emp_id).toLowerCase();
+      const shift = (a.shift_name || '').toLowerCase();
+      const status = (a.status || '').toLowerCase();
+      const remarks = (a.remarks || '').toLowerCase();
+      return name.includes(searchQ) || id.includes(searchQ) || shift.includes(searchQ) || status.includes(searchQ) || remarks.includes(searchQ);
+    });
+  }
+
+  if (filteredTodayAtt.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:24px;">${searchQ ? 'No matching attendance records found.' : 'No biometric attendance recorded for today yet. Upload an Excel log file or add a manual punch!'}</td></tr>`;
     return;
   }
 
-  todayAtt.forEach(a => {
+  filteredTodayAtt.forEach(a => {
     const emp = appState.employees.find(e => String(e.id) === String(a.emp_id));
     const currentShift = (emp && appState.shifts[emp.shift_id]) ? appState.shifts[emp.shift_id] : (appState.shifts[a.shift_id] || { name: a.shift_name || 'Standard' });
 
@@ -306,13 +362,28 @@ function renderEmployees() {
 
   const filterSelect = document.getElementById('employee-status-filter');
   const filterVal = filterSelect ? filterSelect.value : 'Active';
+  const searchQ = (document.getElementById('employee-search-input')?.value || '').toLowerCase().trim();
 
-  const filteredEmployees = appState.employees.filter(emp => {
+  let filteredEmployees = appState.employees.filter(emp => {
     const empStatus = emp.status || 'Active';
     if (filterVal === 'Active') return empStatus === 'Active';
     if (filterVal === 'Inactive') return empStatus === 'Inactive';
     return true; // 'All'
   });
+
+  if (searchQ) {
+    filteredEmployees = filteredEmployees.filter(emp =>
+      String(emp.id).toLowerCase().includes(searchQ) ||
+      (emp.name || '').toLowerCase().includes(searchQ) ||
+      (emp.department || '').toLowerCase().includes(searchQ) ||
+      (emp.role || '').toLowerCase().includes(searchQ)
+    );
+  }
+
+  if (filteredEmployees.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:24px;">No employees match your search criteria.</td></tr>`;
+    return;
+  }
 
   filteredEmployees.forEach(emp => {
     const shift = appState.shifts[emp.shift_id] || { name: 'Standard (09:00 - 17:00)' };
@@ -348,7 +419,21 @@ function renderShifts() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  Object.values(appState.shifts).forEach(shift => {
+  const searchQ = (document.getElementById('shift-search-input')?.value || '').toLowerCase().trim();
+  let shiftsList = Object.values(appState.shifts);
+  if (searchQ) {
+    shiftsList = shiftsList.filter(shift =>
+      String(shift.id).toLowerCase().includes(searchQ) ||
+      (shift.name || '').toLowerCase().includes(searchQ)
+    );
+  }
+
+  if (shiftsList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:24px;">No shifts match your search criteria.</td></tr>`;
+    return;
+  }
+
+  shiftsList.forEach(shift => {
     const isOvernight = shift.end_time < shift.start_time;
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -422,17 +507,25 @@ async function saveShift(e) {
     grace_minutes: parseInt(document.getElementById('shift-grace').value) || 15
   };
 
-  // Instant UI Update
+  // Instant UI Update & Cache Persistence
   appState.shifts[shiftData.id] = shiftData;
+  try {
+    localStorage.setItem('cached_app_state', JSON.stringify(appState));
+  } catch (err) {}
+
   closeShiftModal();
   renderEmployees();
+  renderDashboard();
 
   try {
-    await fetch(`${API_BASE}/shifts`, {
+    const res = await fetch(`${API_BASE}/shifts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(shiftData)
     });
+    if (res.ok) {
+      await fetchInitialData();
+    }
   } catch (err) {
     console.error('Error saving custom shift:', err);
   }
@@ -557,9 +650,21 @@ function renderLeaves() {
   const tbody = document.getElementById('leaves-tbody');
   tbody.innerHTML = '';
 
-  const leaves = appState.leaves || [];
+  const searchQ = (document.getElementById('leave-search-input')?.value || '').toLowerCase().trim();
+  let leaves = appState.leaves || [];
+
+  if (searchQ) {
+    leaves = leaves.filter(l =>
+      String(l.id).toLowerCase().includes(searchQ) ||
+      String(l.emp_id).toLowerCase().includes(searchQ) ||
+      (l.emp_name || '').toLowerCase().includes(searchQ) ||
+      (l.leave_type || '').toLowerCase().includes(searchQ) ||
+      (l.reason || '').toLowerCase().includes(searchQ)
+    );
+  }
+
   if (leaves.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:24px;">No leave applications found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:24px;">${searchQ ? 'No leave applications match your search.' : 'No leave applications found.'}</td></tr>`;
     return;
   }
 
@@ -715,62 +820,13 @@ function renderHistory() {
     monthPicker.value = selectedHistoryDateStr.slice(0, 7);
   }
 
-  renderHistoryCalendar();
   renderHistoryTableForDate(selectedHistoryDateStr);
 }
 
-function renderHistoryCalendar() {
-  const monthPicker = document.getElementById('history-month-picker');
-  const container = document.getElementById('calendar-days-container');
-  if (!container || !monthPicker) return;
-
-  container.innerHTML = '';
-  const ym = monthPicker.value || selectedHistoryDateStr.slice(0, 7);
-  const [yearStr, monthStr] = ym.split('-');
-  const year = parseInt(yearStr);
-  const month = parseInt(monthStr) - 1; // 0-indexed
-
-  // First day of month and total days in month
-  const firstDayObj = new Date(year, month, 1);
-  const lastDayObj = new Date(year, month + 1, 0);
-  const totalDays = lastDayObj.getDate();
-
-  // Day of week for 1st day (0 = Sun, 1 = Mon, ..., 6 = Sat)
-  // We want Monday-based grid (0 = Mon, ..., 6 = Sun)
-  let startDayOfWeek = firstDayObj.getDay() - 1;
-  if (startDayOfWeek === -1) startDayOfWeek = 6; // Sunday becomes 6
-
-  // Render empty leading cells for days before the 1st
-  for (let i = 0; i < startDayOfWeek; i++) {
-    const emptyCard = document.createElement('div');
-    emptyCard.className = 'calendar-day-card other-month';
-    container.appendChild(emptyCard);
-  }
-
-  // Render days of the month
-  for (let day = 1; day <= totalDays; day++) {
-    const dayStr = String(day).padStart(2, '0');
-    const dateStr = `${yearStr}-${monthStr}-${dayStr}`;
-
-    const dayPunches = appState.attendance.filter(a => a.date === dateStr);
-    const count = dayPunches.length;
-
-    const isSelected = dateStr === selectedHistoryDateStr;
-    const card = document.createElement('div');
-    card.className = `calendar-day-card ${isSelected ? 'active-day' : ''}`;
-    card.onclick = () => selectHistoryDate(dateStr);
-
-    const badgeHtml = count > 0
-      ? `<span class="calendar-day-badge badge-has-data"><i class="fa-solid fa-check"></i> ${count} Logs</span>`
-      : `<span class="calendar-day-badge badge-no-data">No logs</span>`;
-
-    card.innerHTML = `
-      <div class="calendar-day-num">${day}</div>
-      ${badgeHtml}
-    `;
-
-    container.appendChild(card);
-  }
+function onHistoryMonthChange(monthStr) {
+  if (!monthStr) return;
+  const firstDate = `${monthStr}-01`;
+  selectHistoryDate(firstDate);
 }
 
 function selectHistoryDate(dateStr) {
@@ -781,13 +837,16 @@ function selectHistoryDate(dateStr) {
   if (datePicker) datePicker.value = dateStr;
   if (monthPicker) monthPicker.value = dateStr.slice(0, 7);
 
-  renderHistoryCalendar();
   renderHistoryTableForDate(dateStr);
 }
 
 function jumpToTodayHistory() {
   const todayStr = new Date().toISOString().slice(0, 10);
   selectHistoryDate(todayStr);
+}
+
+function renderHistoryLogsTable() {
+  renderHistoryTableForDate(selectedHistoryDateStr);
 }
 
 function renderHistoryTableForDate(dateStr) {
@@ -807,6 +866,20 @@ function renderHistoryTableForDate(dateStr) {
 
   const dayAtt = appState.attendance.filter(a => a.date === dateStr);
 
+  const searchQ = (document.getElementById('history-search-input')?.value || '').toLowerCase().trim();
+  let filteredDayAtt = dayAtt;
+  if (searchQ) {
+    filteredDayAtt = dayAtt.filter(a => {
+      const emp = appState.employees.find(e => String(e.id) === String(a.emp_id));
+      const name = (emp ? emp.name : a.emp_name || '').toLowerCase();
+      const id = String(a.emp_id).toLowerCase();
+      const shift = (a.shift_name || '').toLowerCase();
+      const status = (a.status || '').toLowerCase();
+      const remarks = (a.remarks || '').toLowerCase();
+      return name.includes(searchQ) || id.includes(searchQ) || shift.includes(searchQ) || status.includes(searchQ) || remarks.includes(searchQ);
+    });
+  }
+
   if (summaryBadgeEl) {
     if (dayAtt.length === 0) {
       summaryBadgeEl.innerHTML = `<span style="color:var(--text-muted);">0 Records Logged</span>`;
@@ -817,12 +890,12 @@ function renderHistoryTableForDate(dateStr) {
     }
   }
 
-  if (dayAtt.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:32px;">No biometric attendance recorded for <strong>${dateStr}</strong>. Select another date from the calendar above!</td></tr>`;
+  if (filteredDayAtt.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:32px;">${searchQ ? 'No matching history logs found.' : `No biometric attendance recorded for <strong>${dateStr}</strong>. Select another date from the calendar above!`}</td></tr>`;
     return;
   }
 
-  dayAtt.sort((a, b) => (a.check_in || '').localeCompare(b.check_in || '')).forEach(a => {
+  filteredDayAtt.sort((a, b) => (a.check_in || '').localeCompare(b.check_in || '')).forEach(a => {
     const emp = appState.employees.find(e => String(e.id) === String(a.emp_id));
     const currentShift = (emp && appState.shifts[emp.shift_id]) ? appState.shifts[emp.shift_id] : (appState.shifts[a.shift_id] || { name: a.shift_name || 'Standard' });
 
@@ -850,6 +923,9 @@ async function fetchPayroll() {
     const res = await fetch(`${API_BASE}/payroll/calculate?month=${ym}&status=${statusFilter}`);
     const data = await res.json();
     appState.currentPayroll = data.payroll || [];
+    try {
+      localStorage.setItem('cached_app_state', JSON.stringify(appState));
+    } catch (e) {}
     renderPayrollTable(data.payroll);
   } catch (err) {
     console.error('Error fetching payroll:', err);
@@ -860,8 +936,19 @@ function renderPayrollTable(payrollList) {
   const tbody = document.getElementById('payroll-tbody');
   tbody.innerHTML = '';
 
+  payrollList = payrollList || appState.currentPayroll || [];
+
+  const searchQ = (document.getElementById('payroll-search-input')?.value || '').toLowerCase().trim();
+  if (searchQ) {
+    payrollList = payrollList.filter(p =>
+      String(p.emp_id).toLowerCase().includes(searchQ) ||
+      (p.emp_name || '').toLowerCase().includes(searchQ) ||
+      (p.department || '').toLowerCase().includes(searchQ)
+    );
+  }
+
   if (!payrollList || payrollList.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:24px;">No employees to generate payroll.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:24px;">${searchQ ? 'No payroll records match your search.' : 'No employees to generate payroll.'}</td></tr>`;
     return;
   }
 
@@ -1089,43 +1176,63 @@ async function logAuditEvent(action, details, performed_by = 'System Admin') {
 
 // PAYSLIP GENERATOR & EXPORTER
 async function openPayslipModalAll() {
-  if (!appState.currentPayroll || appState.currentPayroll.length === 0) {
-    await fetchPayroll();
-  }
-  
-  let payrollList = appState.currentPayroll || [];
-
-  // Fail-safe fallback if currentPayroll is empty but employees exist
-  if (payrollList.length === 0 && appState.employees && appState.employees.length > 0) {
-    const selMonth = document.getElementById('payroll-month-picker').value || new Date().toISOString().slice(0, 7);
-    payrollList = appState.employees.filter(e => (e.status || 'Active') === 'Active').map(e => {
-      const base = parseFloat(e.base_salary || 50000);
-      const quota = parseFloat(e.annual_leave_quota !== undefined ? e.annual_leave_quota : 24.0);
-      const daily = base / 30.0;
-      return {
-        emp_id: String(e.id),
-        emp_name: e.name,
-        department: e.department || 'General',
-        base_salary: base,
-        daily_rate: Math.round(daily * 100) / 100,
-        annual_quota: quota,
-        total_ytd_used: 0.0,
-        quota_remaining: quota,
-        chargeable_days: 0.0,
-        deduction_amount: 0.0,
-        net_salary: base,
-        month: selMonth
-      };
-    });
+  const btn = document.querySelector('button[onclick="openPayslipModalAll()"]');
+  let origHTML = '';
+  if (btn) {
+    origHTML = btn.innerHTML;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Generating...`;
+    btn.disabled = true;
   }
 
-  if (payrollList.length === 0) {
-    alert('No active employees found to generate salary slips.');
-    return;
-  }
+  // Microtask yield to ensure browser renders spinner instantly
+  await new Promise(resolve => setTimeout(resolve, 30));
 
-  renderPayslips(payrollList);
-  document.getElementById('payslip-modal').classList.add('active');
+  try {
+    if (!appState.currentPayroll || appState.currentPayroll.length === 0) {
+      await fetchPayroll();
+    }
+    
+    let payrollList = appState.currentPayroll || [];
+
+    // Fail-safe fallback if currentPayroll is empty but employees exist
+    if (payrollList.length === 0 && appState.employees && appState.employees.length > 0) {
+      const selMonth = document.getElementById('payroll-month-picker').value || new Date().toISOString().slice(0, 7);
+      payrollList = appState.employees.filter(e => (e.status || 'Active') === 'Active').map(e => {
+        const base = parseFloat(e.base_salary || 50000);
+        const quota = parseFloat(e.annual_leave_quota !== undefined ? e.annual_leave_quota : 24.0);
+        const daily = base / 30.0;
+        return {
+          emp_id: String(e.id),
+          emp_name: e.name,
+          department: e.department || 'General',
+          base_salary: base,
+          daily_rate: Math.round(daily * 100) / 100,
+          annual_quota: quota,
+          total_ytd_used: 0.0,
+          quota_remaining: quota,
+          chargeable_days: 0.0,
+          deduction_amount: 0.0,
+          net_salary: base,
+          month: selMonth
+        };
+      });
+    }
+
+    if (payrollList.length === 0) {
+      alert('No active employees found to generate salary slips.');
+      return;
+    }
+
+    renderPayslips(payrollList);
+    document.getElementById('payslip-modal').classList.add('active');
+  } catch (err) {
+    console.error('Error generating payslips:', err);
+  } finally {
+    if (btn) {
+      btn.innerHTML = origHTML;
+      btn.disabled = false;
+    }
+  }
 }
 
 async function openPayslipModalSingle(empId) {
@@ -1259,47 +1366,93 @@ function printPayslips() {
 }
 
 async function exportPayrollExcel() {
-  if (!appState.currentPayroll || appState.currentPayroll.length === 0) {
-    await fetchPayroll();
-  }
-  
-  const payrollList = appState.currentPayroll || [];
-  if (payrollList.length === 0) {
-    alert('No payroll summary generated for selected month.');
-    return;
+  const btn = document.querySelector('button[onclick="exportPayrollExcel()"]');
+  let origHTML = '';
+  if (btn) {
+    origHTML = btn.innerHTML;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Exporting...`;
+    btn.disabled = true;
   }
 
-  const monthStr = document.getElementById('payroll-month-picker').value || new Date().toISOString().slice(0, 7);
+  // Microtask yield to ensure browser renders spinner instantly
+  await new Promise(resolve => setTimeout(resolve, 30));
 
-  // Headers for CSV / Excel
-  let csvContent = "\uFEFFEmp ID,Employee Name,Department,Base Salary (PKR),Daily Wage Rate (PKR),Annual Free Quota (Days),Total YTD Leaves Used (Days),Free Quota Remaining (Days),Cut Days (This Month),Total Deduction Amount (PKR),Net Payable Salary (PKR)\n";
+  try {
+    if (!appState.currentPayroll || appState.currentPayroll.length === 0) {
+      await fetchPayroll();
+    }
+    
+    let payrollList = appState.currentPayroll || [];
 
-  payrollList.forEach(p => {
-    const row = [
-      `"${p.emp_id}"`,
-      `"${(p.emp_name || '').replace(/"/g, '""')}"`,
-      `"${(p.department || 'General').replace(/"/g, '""')}"`,
-      p.base_salary,
-      p.daily_rate,
-      p.annual_quota,
-      p.total_ytd_used,
-      p.quota_remaining,
-      p.chargeable_days,
-      p.deduction_amount,
-      p.net_salary
-    ];
-    csvContent += row.join(",") + "\n";
-  });
+    // Fallback if currentPayroll is empty but employees exist
+    if (payrollList.length === 0 && appState.employees && appState.employees.length > 0) {
+      const selMonth = document.getElementById('payroll-month-picker').value || new Date().toISOString().slice(0, 7);
+      payrollList = appState.employees.filter(e => (e.status || 'Active') === 'Active').map(e => {
+        const base = parseFloat(e.base_salary || 50000);
+        const quota = parseFloat(e.annual_leave_quota !== undefined ? e.annual_leave_quota : 24.0);
+        const daily = base / 30.0;
+        return {
+          emp_id: String(e.id),
+          emp_name: e.name,
+          department: e.department || 'General',
+          base_salary: base,
+          daily_rate: Math.round(daily * 100) / 100,
+          annual_quota: quota,
+          total_ytd_used: 0.0,
+          quota_remaining: quota,
+          chargeable_days: 0.0,
+          deduction_amount: 0.0,
+          net_salary: base,
+          month: selMonth
+        };
+      });
+    }
 
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  link.setAttribute("href", url);
-  link.setAttribute("download", `NEFLOGIX_Payroll_Summary_${monthStr}.csv`);
-  link.style.visibility = 'hidden';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+    if (payrollList.length === 0) {
+      alert('No payroll summary generated for selected month.');
+      return;
+    }
 
-  logAuditEvent('Export Payroll', `Exported monthly payroll summary spreadsheet for ${monthStr} (${payrollList.length} employees)`);
+    const monthStr = document.getElementById('payroll-month-picker').value || new Date().toISOString().slice(0, 7);
+
+    // Headers for CSV / Excel
+    let csvContent = "\uFEFFEmp ID,Employee Name,Department,Base Salary (PKR),Daily Wage Rate (PKR),Annual Free Quota (Days),Total YTD Leaves Used (Days),Free Quota Remaining (Days),Cut Days (This Month),Total Deduction Amount (PKR),Net Payable Salary (PKR)\n";
+
+    payrollList.forEach(p => {
+      const row = [
+        `"${p.emp_id}"`,
+        `"${(p.emp_name || '').replace(/"/g, '""')}"`,
+        `"${(p.department || 'General').replace(/"/g, '""')}"`,
+        p.base_salary,
+        p.daily_rate,
+        p.annual_quota,
+        p.total_ytd_used,
+        p.quota_remaining,
+        p.chargeable_days,
+        p.deduction_amount,
+        p.net_salary
+      ];
+      csvContent += row.join(",") + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `NEFLOGIX_Payroll_Summary_${monthStr}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    logAuditEvent('Export Payroll', `Exported monthly payroll summary spreadsheet for ${monthStr} (${payrollList.length} employees)`);
+  } catch (err) {
+    console.error('Error exporting payroll:', err);
+    alert('Failed to export payroll: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.innerHTML = origHTML;
+      btn.disabled = false;
+    }
+  }
 }

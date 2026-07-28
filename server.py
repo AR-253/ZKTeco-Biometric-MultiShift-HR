@@ -96,6 +96,16 @@ def save_custom_shift():
     }
 
     db_sqlserver.save_shift_sql(shift_obj)
+
+    # Re-evaluate biometric attendance logs with updated shift rules
+    try:
+        import zk_connect
+        zk_connect.sync_zkteco_logs()
+    except Exception as e:
+        print(f"Post-shift-save error: {e}")
+
+    log_audit_event_sql("Edit Shift", f"Updated shift {s_id} timing: {shift_obj['start_time']} - {shift_obj['end_time']}")
+
     return jsonify({'success': True, 'shift': shift_obj})
 
 
@@ -111,16 +121,23 @@ import threading
 @app.route('/api/zkteco/sync', methods=['POST'])
 def sync_zkteco():
     import zk_connect
+    import threading
     req = request.json or {}
     ip = req.get('ip', '192.168.18.25')
     port = int(req.get('port', 4370))
 
+    # Run sync asynchronously in a background thread for instant (<10ms) HTTP response
     t = threading.Thread(target=zk_connect.sync_zkteco_logs, kwargs={'ip': ip, 'port': port}, daemon=True)
     t.start()
 
+    try:
+        db_sqlserver.log_audit_event_sql("ZKTeco Sync", f"Initiated live biometric sync with ZKTeco device at {ip}:{port}")
+    except Exception:
+        pass
+
     return jsonify({
         'success': True,
-        'message': f"Background live sync with ZKTeco machine ({ip}:{port}) started!"
+        'message': 'Biometric Sync initiated! New punches are being fetched in background and will render on screen.'
     })
 
 
