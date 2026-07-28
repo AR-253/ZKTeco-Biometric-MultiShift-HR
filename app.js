@@ -255,6 +255,9 @@ function renderDashboard() {
     return;
   }
 
+  // Permanently sort table by Employee ID (1, 2, 3, 4...) so rows NEVER jump around
+  filteredTodayAtt.sort((a, b) => (parseInt(a.emp_id) || 0) - (parseInt(b.emp_id) || 0));
+
   filteredTodayAtt.forEach(a => {
     const emp = appState.employees.find(e => String(e.id) === String(a.emp_id));
     const currentShift = (emp && appState.shifts[emp.shift_id]) ? appState.shifts[emp.shift_id] : (appState.shifts[a.shift_id] || { name: a.shift_name || 'Standard' });
