@@ -116,28 +116,48 @@ def delete_shift(shift_id):
 
 
 
-import threading
+sync_state = {
+    'in_progress': False,
+    'last_sync': None,
+    'last_message': ''
+}
+
+def run_background_sync(ip, port):
+    global sync_state
+    import zk_connect
+    sync_state['in_progress'] = True
+    try:
+        res = zk_connect.sync_zkteco_logs(ip=ip, port=port)
+        sync_state['last_message'] = res.get('message', 'Sync completed')
+        sync_state['last_sync'] = datetime.datetime.now().strftime('%H:%M:%S')
+    except Exception as e:
+        sync_state['last_message'] = f"Sync error: {e}"
+    finally:
+        sync_state['in_progress'] = False
+
+@app.route('/api/zkteco/status', methods=['GET'])
+def zkteco_status():
+    return jsonify(sync_state)
 
 @app.route('/api/zkteco/sync', methods=['POST'])
 def sync_zkteco():
-    import zk_connect
     import threading
     req = request.json or {}
     ip = req.get('ip', '192.168.18.25')
     port = int(req.get('port', 4370))
 
-    # Run sync asynchronously in a background thread for instant (<10ms) HTTP response
-    t = threading.Thread(target=zk_connect.sync_zkteco_logs, kwargs={'ip': ip, 'port': port}, daemon=True)
-    t.start()
-
-    try:
-        db_sqlserver.log_audit_event_sql("ZKTeco Sync", f"Initiated live biometric sync with ZKTeco device at {ip}:{port}")
-    except Exception:
-        pass
+    if not sync_state['in_progress']:
+        t = threading.Thread(target=run_background_sync, args=(ip, port), daemon=True)
+        t.start()
+        try:
+            db_sqlserver.log_audit_event_sql("ZKTeco Sync", f"Initiated live biometric sync with ZKTeco device at {ip}:{port}")
+        except Exception:
+            pass
 
     return jsonify({
         'success': True,
-        'message': 'Biometric Sync initiated! New punches are being fetched in background and will render on screen.'
+        'message': 'Hardware sync in progress...',
+        'status': sync_state
     })
 
 

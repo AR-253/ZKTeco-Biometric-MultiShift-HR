@@ -104,20 +104,25 @@ async function syncZKTecoMachine() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ip: '192.168.18.25', port: 4370 })
     });
-    const result = await res.json().catch(() => ({ success: false, message: 'Server returned non-JSON response.' }));
     
-    if (res.ok && result.success) {
-      // Re-fetch UI data after 3s background hardware read
-      setTimeout(async () => {
-        await fetchInitialData();
-      }, 3000);
-      alert(`ZKTeco Biometric Sync Started!\n\n${result.message}`);
-    } else {
-      alert(`ZKTeco Sync Status: ${result.error || result.message || 'Sync initiated.'}`);
+    // Poll hardware state until machine socket read finishes
+    let attempts = 0;
+    while (attempts < 20) {
+      await new Promise(r => setTimeout(r, 1500));
+      attempts++;
+      try {
+        const stRes = await fetch(`${API_BASE}/zkteco/status`);
+        const stData = await stRes.json();
+        if (!stData.in_progress) {
+          await fetchInitialData();
+          break;
+        }
+      } catch (e) {}
     }
+    await fetchInitialData();
   } catch (err) {
     console.error('Sync error:', err);
-    alert(`ZKTeco Sync Notice: ${err.message}`);
+    await fetchInitialData();
   } finally {
     if (btn) {
       btn.innerHTML = originalText;
