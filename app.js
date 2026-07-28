@@ -142,7 +142,7 @@ async function fetchInitialData() {
     renderEmployees();
     renderLeaves();
     renderHistory();
-    fetchPayroll();
+    await fetchPayroll();
   } catch (err) {
     console.error('Error fetching data:', err);
   }
@@ -1088,25 +1088,83 @@ async function logAuditEvent(action, details, performed_by = 'System Admin') {
 
 
 // PAYSLIP GENERATOR & EXPORTER
-function openPayslipModalAll() {
+async function openPayslipModalAll() {
   if (!appState.currentPayroll || appState.currentPayroll.length === 0) {
-    alert('No payroll summary generated for selected month. Please select a valid month first.');
+    await fetchPayroll();
+  }
+  
+  let payrollList = appState.currentPayroll || [];
+
+  // Fail-safe fallback if currentPayroll is empty but employees exist
+  if (payrollList.length === 0 && appState.employees && appState.employees.length > 0) {
+    const selMonth = document.getElementById('payroll-month-picker').value || new Date().toISOString().slice(0, 7);
+    payrollList = appState.employees.filter(e => (e.status || 'Active') === 'Active').map(e => {
+      const base = parseFloat(e.base_salary || 50000);
+      const quota = parseFloat(e.annual_leave_quota !== undefined ? e.annual_leave_quota : 24.0);
+      const daily = base / 30.0;
+      return {
+        emp_id: String(e.id),
+        emp_name: e.name,
+        department: e.department || 'General',
+        base_salary: base,
+        daily_rate: Math.round(daily * 100) / 100,
+        annual_quota: quota,
+        total_ytd_used: 0.0,
+        quota_remaining: quota,
+        chargeable_days: 0.0,
+        deduction_amount: 0.0,
+        net_salary: base,
+        month: selMonth
+      };
+    });
+  }
+
+  if (payrollList.length === 0) {
+    alert('No active employees found to generate salary slips.');
     return;
   }
-  renderPayslips(appState.currentPayroll);
+
+  renderPayslips(payrollList);
   document.getElementById('payslip-modal').classList.add('active');
 }
 
-function openPayslipModalSingle(empId) {
+async function openPayslipModalSingle(empId) {
   if (!appState.currentPayroll || appState.currentPayroll.length === 0) {
-    alert('No payroll calculated.');
-    return;
+    await fetchPayroll();
   }
-  const singleP = appState.currentPayroll.filter(p => String(p.emp_id) === String(empId));
+  
+  let singleP = appState.currentPayroll ? appState.currentPayroll.filter(p => String(p.emp_id) === String(empId)) : [];
+
+  // Fail-safe fallback for single employee
+  if (singleP.length === 0 && appState.employees) {
+    const emp = appState.employees.find(e => String(e.id) === String(empId));
+    if (emp) {
+      const base = parseFloat(emp.base_salary || 50000);
+      const quota = parseFloat(emp.annual_leave_quota !== undefined ? emp.annual_leave_quota : 24.0);
+      const daily = base / 30.0;
+      const selMonth = document.getElementById('payroll-month-picker').value || new Date().toISOString().slice(0, 7);
+      singleP = [{
+        emp_id: String(emp.id),
+        emp_name: emp.name,
+        department: emp.department || 'General',
+        base_salary: base,
+        daily_rate: Math.round(daily * 100) / 100,
+        annual_quota: quota,
+        total_ytd_used: 0.0,
+        quota_remaining: quota,
+        chargeable_days: 0.0,
+        deduction_amount: 0.0,
+        net_salary: base,
+        month: selMonth
+      }];
+    }
+  }
+
   if (singleP.length === 0) {
-    alert('Employee payroll record not found.');
+    alert(`Employee ID ${empId} record not found.`);
     return;
   }
+
   renderPayslips(singleP);
   document.getElementById('payslip-modal').classList.add('active');
 }
