@@ -1257,3 +1257,49 @@ function renderPayslips(payrollList) {
 function printPayslips() {
   window.print();
 }
+
+async function exportPayrollExcel() {
+  if (!appState.currentPayroll || appState.currentPayroll.length === 0) {
+    await fetchPayroll();
+  }
+  
+  const payrollList = appState.currentPayroll || [];
+  if (payrollList.length === 0) {
+    alert('No payroll summary generated for selected month.');
+    return;
+  }
+
+  const monthStr = document.getElementById('payroll-month-picker').value || new Date().toISOString().slice(0, 7);
+
+  // Headers for CSV / Excel
+  let csvContent = "\uFEFFEmp ID,Employee Name,Department,Base Salary (PKR),Daily Wage Rate (PKR),Annual Free Quota (Days),Total YTD Leaves Used (Days),Free Quota Remaining (Days),Cut Days (This Month),Total Deduction Amount (PKR),Net Payable Salary (PKR)\n";
+
+  payrollList.forEach(p => {
+    const row = [
+      `"${p.emp_id}"`,
+      `"${(p.emp_name || '').replace(/"/g, '""')}"`,
+      `"${(p.department || 'General').replace(/"/g, '""')}"`,
+      p.base_salary,
+      p.daily_rate,
+      p.annual_quota,
+      p.total_ytd_used,
+      p.quota_remaining,
+      p.chargeable_days,
+      p.deduction_amount,
+      p.net_salary
+    ];
+    csvContent += row.join(",") + "\n";
+  });
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", `NEFLOGIX_Payroll_Summary_${monthStr}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  logAuditEvent('Export Payroll', `Exported monthly payroll summary spreadsheet for ${monthStr} (${payrollList.length} employees)`);
+}

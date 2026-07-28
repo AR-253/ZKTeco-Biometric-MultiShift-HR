@@ -607,18 +607,24 @@ tr:hover td {
   border-collapse: collapse;
   margin-bottom: 24px;
   font-size: 13px;
+  background: #ffffff !important;
 }
 
 .payslip-table th, .payslip-table td {
   padding: 10px 14px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e2e8f0 !important;
   text-align: left;
 }
 
 .payslip-table th {
-  background: #f1f5f9;
+  background: #f1f5f9 !important;
   font-weight: 700;
-  color: #334155;
+  color: #1e293b !important;
+}
+
+.payslip-table td {
+  background: #ffffff !important;
+  color: #334155 !important;
 }
 
 .payslip-summary-box {
