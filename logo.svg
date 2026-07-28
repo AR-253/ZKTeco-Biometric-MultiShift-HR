@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 320" width="100%" height="100%">
+  <!-- NEFLOGIX N Circuit Icon -->
+  <g fill="none" stroke="#3b82f6" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Main N Frame -->
+    <line x1="130" y1="50" x2="130" y2="200" />
+    <line x1="130" y1="50" x2="270" y2="200" />
+    <line x1="270" y1="50" x2="270" y2="200" />
+    
+    <!-- Circuit Stems & Nodes -->
+    <!-- Node 1: Top Left Stem -->
+    <line x1="130" y1="90" x2="160" y2="90" />
+    <circle cx="160" cy="90" r="10" fill="#0b0f19" stroke="#3b82f6" stroke-width="7" />
+
+    <!-- Node 2: Top Right Stem -->
+    <line x1="270" y1="80" x2="235" y2="80" />
+    <circle cx="235" cy="80" r="10" fill="#0b0f19" stroke="#3b82f6" stroke-width="7" />
+
+    <!-- Node 3: Far Left Outer Node -->
+    <line x1="130" y1="135" x2="105" y2="135" />
+    <circle cx="105" cy="135" r="10" fill="#0b0f19" stroke="#3b82f6" stroke-width="7" />
+
+    <!-- Node 4: Far Right Outer Node -->
+    <line x1="270" y1="140" x2="295" y2="140" />
+    <circle cx="295" cy="140" r="10" fill="#0b0f19" stroke="#3b82f6" stroke-width="7" />
+
+    <!-- Node 5: Lower Left Inner Node -->
+    <line x1="175" y1="165" x2="175" y2="185" />
+    <circle cx="175" cy="185" r="10" fill="#0b0f19" stroke="#3b82f6" stroke-width="7" />
+
+    <!-- Node 6: Bottom Right Stem -->
+    <line x1="230" y1="200" x2="230" y2="225" />
+    <circle cx="230" cy="225" r="10" fill="#0b0f19" stroke="#3b82f6" stroke-width="7" />
+  </g>
+
+  <!-- Wordmark NEFLOGIX -->
+  <text x="200" y="285" font-family="'Orbitron', 'Montserrat', 'Segoe UI', system-ui, sans-serif" font-size="36" font-weight="900" fill="#3b82f6" letter-spacing="9" text-anchor="middle">NEFLOGIX</text>
+</svg>

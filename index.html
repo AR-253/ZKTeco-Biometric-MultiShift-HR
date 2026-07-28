@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEFLOGIX | Smart Biometric & HR Management System</title>
+  <link rel="stylesheet" href="styles.css?v=1.0.2">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo-box" style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); padding: 6px 10px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+        <img src="logo.svg" alt="NEFLOGIX Logo" style="height: 32px; width: auto; display: block;">
+      </div>
+      <div>
+        <div class="brand-title" style="font-weight: 900; letter-spacing: 1.5px; color: #fff;">NEFLOGIX</div>
+        <div class="brand-subtitle">SMART BIOMETRIC & MULTI-SHIFT</div>
+      </div>
+    </div>
+
+    <ul class="nav-list">
+      <li class="nav-item">
+        <button id="nav-dashboard" class="active" onclick="switchTab('dashboard')">
+          <i class="fa-solid fa-chart-pie"></i> Real-Time Dashboard
+        </button>
+      </li>
+      <li class="nav-item">
+        <button id="nav-biometric" onclick="switchTab('biometric')">
+          <i class="fa-solid fa-file-excel"></i> Biometric Log Import
+        </button>
+      </li>
+      <li class="nav-item">
+        <button id="nav-employees" onclick="switchTab('employees')">
+          <i class="fa-solid fa-users-gear"></i> Employees & Shifts
+        </button>
+      </li>
+      <li class="nav-item">
+        <button id="nav-leaves" onclick="switchTab('leaves')">
+          <i class="fa-solid fa-calendar-minus"></i> Leave Manager
+        </button>
+      </li>
+      <li class="nav-item">
+        <button id="nav-history" onclick="switchTab('history')">
+          <i class="fa-solid fa-clock-rotate-left"></i> Monthly History
+        </button>
+      </li>
+      <li class="nav-item">
+        <button id="nav-payroll" onclick="switchTab('payroll')">
+          <i class="fa-solid fa-calculator"></i> Payroll & Salary Cuts
+        </button>
+      </li>
+      <li class="nav-item">
+        <button id="nav-audit" onclick="switchTab('audit')">
+          <i class="fa-solid fa-receipt"></i> Audit Trail & System Logs
+        </button>
+      </li>
+    </ul>
+  </aside>
+
+  <!-- Main Content Wrapper -->
+  <div class="main-wrapper">
+    <!-- Header -->
+    <header class="header">
+      <div class="page-header-title" id="page-title">Real-Time Attendance Dashboard</div>
+      <div class="header-right">
+        <button class="btn btn-secondary" style="padding: 6px 14px; font-size:12px;" onclick="syncZKTecoTime()" title="Sync ZKTeco Machine Clock with PC Time">
+          <i class="fa-solid fa-clock"></i> Fix Machine Time
+        </button>
+        <button class="btn btn-primary" style="padding: 6px 16px; font-size:13px;" onclick="syncZKTecoMachine()">
+          <i class="fa-solid fa-network-wired"></i> Sync ZKTeco (192.168.18.25)
+        </button>
+        <div class="live-badge">
+          <span class="live-dot"></span> Live Biometric Feed
+        </div>
+        <div id="live-clock" style="font-weight:700; font-size:14px; color:var(--text-muted);">--:--:--</div>
+      </div>
+    </header>
+
+
+
+    <!-- Content View Container -->
+    <main class="content-area">
+
+      <!-- TAB 1: Real-Time Dashboard -->
+      <div id="tab-dashboard" class="tab-page">
+        <div class="stats-grid">
+          <div class="glass-card stat-box">
+            <div class="stat-icon stat-blue"><i class="fa-solid fa-users"></i></div>
+            <div>
+              <div class="stat-val" id="stat-total-emp">0</div>
+              <div class="stat-lbl">Total Employees</div>
+            </div>
+          </div>
+          <div class="glass-card stat-box">
+            <div class="stat-icon stat-green"><i class="fa-solid fa-user-check"></i></div>
+            <div>
+              <div class="stat-val" id="stat-ontime">0</div>
+              <div class="stat-lbl">On Time Today</div>
+            </div>
+          </div>
+          <div class="glass-card stat-box">
+            <div class="stat-icon stat-yellow"><i class="fa-solid fa-clock-pulse"></i></div>
+            <div>
+              <div class="stat-val" id="stat-late-cuts">0</div>
+              <div class="stat-lbl">Late / Shift Cuts</div>
+            </div>
+          </div>
+          <div class="glass-card stat-box">
+            <div class="stat-icon stat-red"><i class="fa-solid fa-user-xmark"></i></div>
+            <div>
+              <div class="stat-val" id="stat-absent">0</div>
+              <div class="stat-lbl">Absent / Missing</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card" style="margin-bottom:28px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="font-size:16px;"><i class="fa-solid fa-list-check"></i> Today's Live Attendance Feed</h3>
+            <button class="btn btn-primary" onclick="openManualPunchModal()"><i class="fa-solid fa-plus"></i> Manual Punch</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Emp ID</th>
+                  <th>Employee Name</th>
+                  <th>Assigned Shift</th>
+                  <th>Check In</th>
+                  <th>Check Out</th>
+                  <th>Hours</th>
+                  <th>Penalty Status</th>
+                  <th>Remarks</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="live-attendance-tbody">
+                <tr><td colspan="9" style="text-align:center; color:var(--text-muted);">No attendance records for today yet. Import biometric logs to view!</td></tr>
+              </tbody>
+
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: Biometric Log Import -->
+      <div id="tab-biometric" class="tab-page" style="display:none;">
+        <div class="glass-card">
+          <h3 style="margin-bottom:8px;"><i class="fa-solid fa-file-excel"></i> Import Thumb Machine Excel Log</h3>
+          <p style="color:var(--text-muted); font-size:14px; margin-bottom:24px;">Upload the <code>.xls</code> or <code>.xlsx</code> file exported from your biometric machine. System will automatically extract punches and calculate shift cuts.</p>
+
+          <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
+            <i class="fa-solid fa-cloud-arrow-up dropzone-icon"></i>
+            <div style="font-weight:700; font-size:16px; margin-bottom:6px;">Drop your Biometric Excel File (.xls / .xlsx) here</div>
+            <div style="color:var(--text-muted); font-size:13px;">or click to browse from computer</div>
+            <input type="file" id="file-input" accept=".xls,.xlsx,.csv" style="display:none" onchange="handleFileSelect(event)">
+          </div>
+
+          <div id="upload-status" style="margin-top:16px;"></div>
+        </div>
+      </div>
+
+      <!-- TAB 3: Employees & Shifts -->
+      <div id="tab-employees" class="tab-page" style="display:none;">
+        <div class="glass-card" style="margin-bottom:28px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3><i class="fa-solid fa-clock"></i> Active Work Shifts</h3>
+            <button class="btn btn-secondary" onclick="openShiftModal()"><i class="fa-solid fa-plus"></i> Create Custom Shift</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Shift ID</th>
+                  <th>Shift Name</th>
+                  <th>Start Time</th>
+                  <th>End Time</th>
+                  <th>Grace Minutes</th>
+                  <th>Type</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="shifts-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+            <h3><i class="fa-solid fa-users"></i> Employee Directory & Assigned Shifts</h3>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <select id="employee-status-filter" class="input-field" style="width:160px; padding:6px 12px; font-size:13px;" onchange="renderEmployees()">
+                <option value="All">All Statuses</option>
+                <option value="Active" selected>Active Only</option>
+                <option value="Inactive">Inactive Only</option>
+              </select>
+              <button class="btn btn-primary" onclick="openEmployeeModal()"><i class="fa-solid fa-user-plus"></i> Add Employee</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Department</th>
+                  <th>Role</th>
+                  <th>Base Salary</th>
+                  <th>Assigned Shift</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="employees-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- TAB 4: Leave Manager -->
+      <div id="tab-leaves" class="tab-page" style="display:none;">
+        <div class="glass-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3><i class="fa-solid fa-calendar-minus"></i> Leave Applications (Full / Half / Quarter)</h3>
+            <button class="btn btn-primary" onclick="openLeaveModal()"><i class="fa-solid fa-plus"></i> Apply Leave</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Leave ID</th>
+                  <th>Employee</th>
+                  <th>Assigned Shift</th>
+                  <th>From Date</th>
+                  <th>To Date</th>
+                  <th>Type</th>
+                  <th>Deduction Rate</th>
+                  <th>Reason</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="leaves-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: Monthly History -->
+      <div id="tab-history" class="tab-page" style="display:none;">
+        <div class="glass-card" style="margin-bottom:24px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:16px;">
+            <div>
+              <h3 style="margin-bottom:4px;"><i class="fa-solid fa-calendar-days"></i> Biometric Attendance Calendar View</h3>
+              <div style="font-size:13px; color:var(--text-muted);">Select any date on the calendar or date picker to view clean daily logs</div>
+            </div>
+            <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+              <div style="display:flex; gap:6px; align-items:center;">
+                <label style="font-size:13px; color:var(--text-muted);">Month:</label>
+                <input type="month" id="history-month-picker" class="input-field" style="width: auto;" onchange="renderHistoryCalendar()">
+              </div>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <label style="font-size:13px; color:var(--text-muted);">Date:</label>
+                <input type="date" id="history-date-picker" class="input-field" style="width: auto;" onchange="selectHistoryDate(this.value)">
+              </div>
+              <button class="btn btn-secondary" style="padding: 8px 14px; font-size:12px;" onclick="jumpToTodayHistory()"><i class="fa-solid fa-calendar-day"></i> Today</button>
+            </div>
+          </div>
+
+          <!-- Calendar Grid Widget -->
+          <div class="calendar-wrapper">
+            <div class="calendar-header-grid">
+              <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+            </div>
+            <div class="calendar-days-grid" id="calendar-days-container"></div>
+          </div>
+        </div>
+
+        <!-- Filtered Day Log Feed -->
+        <div class="glass-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+            <h4 id="history-selected-date-header" style="font-size:16px; color:var(--text-main);"><i class="fa-solid fa-clock"></i> Attendance Logs</h4>
+            <div id="history-day-summary-badge" style="font-size:13px; font-weight:600; color:var(--accent-purple);"></div>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Emp ID</th>
+                  <th>Name</th>
+                  <th>Shift</th>
+                  <th>Check In</th>
+                  <th>Check Out</th>
+                  <th>Worked Hours</th>
+                  <th>Penalty Status</th>
+                  <th>Remarks</th>
+                </tr>
+              </thead>
+              <tbody id="history-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 6: Payroll & Salary Cuts -->
+      <div id="tab-payroll" class="tab-page" style="display:none;">
+        <div class="glass-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3><i class="fa-solid fa-calculator"></i> Monthly Payroll & Automated Deductions</h3>
+            <div style="display:flex; gap:12px; align-items:center;">
+              <select id="payroll-status-filter" class="input-field" style="width:auto;" onchange="fetchPayroll()">
+                <option value="Active">Active Only</option>
+                <option value="All">All Statuses (Active + Inactive)</option>
+              </select>
+              <input type="month" id="payroll-month-picker" class="input-field" style="width: auto;" onchange="fetchPayroll()">
+              <button class="btn btn-primary" onclick="openPayslipModalAll()"><i class="fa-solid fa-file-invoice-dollar"></i> Generate All Payslips</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Emp ID</th>
+                  <th>Name</th>
+                  <th>Base Salary</th>
+                  <th>Annual Free Quota</th>
+                  <th>YTD Leaves Used</th>
+                  <th>Free Quota Left</th>
+                  <th>Cut Days (This Month)</th>
+                  <th>Total Deduction</th>
+                  <th>Net Payable Salary</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="payroll-tbody"></tbody>
+            </table>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 7: Audit Trail & System Logs -->
+      <div id="tab-audit" class="tab-page" style="display:none;">
+        <div class="glass-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3><i class="fa-solid fa-receipt"></i> System Audit Trail & Activity Logs</h3>
+            <div style="display:flex; gap:12px; align-items:center;">
+              <input type="text" id="audit-search-input" class="input-field" placeholder="Filter audit logs..." onkeyup="filterAuditLogs()">
+              <button class="btn btn-secondary" onclick="fetchAuditLogs()"><i class="fa-solid fa-arrows-rotate"></i> Refresh Logs</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Log ID</th>
+                  <th>Timestamp</th>
+                  <th>Action</th>
+                  <th>Details</th>
+                  <th>Performed By</th>
+                </tr>
+              </thead>
+              <tbody id="audit-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Employee Modal -->
+  <div class="modal-overlay" id="employee-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="emp-modal-title">Add Employee</h3>
+        <button class="modal-close" onclick="closeEmployeeModal()">&times;</button>
+      </div>
+      <form id="emp-form" onsubmit="saveEmployee(event)">
+        <div class="input-group">
+          <label>Employee ID</label>
+          <input type="text" id="emp-id" class="input-field" required placeholder="e.g. 101">
+        </div>
+        <div class="input-group">
+          <label>Full Name</label>
+          <input type="text" id="emp-name" class="input-field" required placeholder="e.g. Ali Ahmed">
+        </div>
+        <div class="input-group">
+          <label>Department</label>
+          <input type="text" id="emp-dept" class="input-field" placeholder="e.g. Accounts / IT">
+        </div>
+        <div class="input-group">
+          <label>Role</label>
+          <input type="text" id="emp-role" class="input-field" placeholder="e.g. Manager">
+        </div>
+        <div style="display:flex; gap:12px;">
+          <div class="input-group" style="flex:1;">
+            <label>Base Salary (PKR)</label>
+            <input type="number" id="emp-salary" class="input-field" required placeholder="e.g. 75000">
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>Annual Quota (Days)</label>
+            <input type="number" id="emp-quota" class="input-field" required value="24.0" step="0.5">
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>Past Leaves Taken</label>
+            <input type="number" id="emp-initial-leaves" class="input-field" value="0.0" step="0.5">
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Assigned Shift</label>
+          <select id="emp-shift" class="input-field"></select>
+        </div>
+        <div class="input-group">
+          <label>Status</label>
+          <select id="emp-status" class="input-field">
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive (Left / Resigned)</option>
+          </select>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeEmployeeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Employee</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Leave Modal -->
+  <div class="modal-overlay" id="leave-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="leave-modal-title">Apply Leave Request</h3>
+        <button class="modal-close" onclick="closeLeaveModal()">&times;</button>
+      </div>
+      <form id="leave-form" onsubmit="saveLeave(event)">
+        <input type="hidden" id="leave-id">
+        <div class="input-group">
+          <label>Select Employee</label>
+          <select id="leave-emp-select" class="input-field" onchange="updateLeaveShiftInfo()" required></select>
+        </div>
+        <div id="leave-shift-info" style="font-size:12px; color:var(--accent-purple); font-weight:700; margin-top:-8px; margin-bottom:12px;"></div>
+        <div class="input-group">
+          <label>Leave Type</label>
+          <select id="leave-type-select" class="input-field">
+            <option value="Full">Full Day (1.0 Day Salary Cut)</option>
+            <option value="Half">Half Day (0.50 Day Salary Cut)</option>
+            <option value="Quarter">Quarter Day (0.25 Day Salary Cut)</option>
+          </select>
+        </div>
+        <div style="display:flex; gap:12px;">
+          <div class="input-group" style="flex:1;">
+            <label>Start Date</label>
+            <input type="date" id="leave-from" class="input-field" required>
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>End Date</label>
+            <input type="date" id="leave-to" class="input-field" required>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Reason</label>
+          <input type="text" id="leave-reason" class="input-field" placeholder="Medical, Personal, etc.">
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeLeaveModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Submit Leave</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Manual Punch Modal -->
+  <div class="modal-overlay" id="manual-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Manual Punch Entry</h3>
+        <button class="modal-close" onclick="closeManualModal()">&times;</button>
+      </div>
+      <form id="manual-form" onsubmit="saveManualPunch(event)">
+        <div class="input-group">
+          <label>Employee</label>
+          <select id="manual-emp-select" class="input-field" required></select>
+        </div>
+        <div class="input-group">
+          <label>Date</label>
+          <input type="date" id="manual-date" class="input-field" required>
+        </div>
+        <div style="display:flex; gap:12px;">
+          <div class="input-group" style="flex:1;">
+            <label>Check In Time</label>
+            <input type="time" id="manual-in" class="input-field" required>
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>Check Out Time</label>
+            <input type="time" id="manual-out" class="input-field">
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeManualModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Punch</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Create Shift Modal -->
+  <div class="modal-overlay" id="shift-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="shift-modal-title">Create Custom Shift</h3>
+        <button class="modal-close" onclick="closeShiftModal()">&times;</button>
+      </div>
+
+      <form id="shift-form" onsubmit="saveShift(event)">
+        <div class="input-group">
+          <label>Shift ID (e.g. S6)</label>
+          <input type="text" id="shift-id" class="input-field" placeholder="Auto-generated if empty">
+        </div>
+        <div class="input-group">
+          <label>Shift Name</label>
+          <input type="text" id="shift-name" class="input-field" required placeholder="e.g. Night Shift (7 PM - 4 AM)">
+        </div>
+        <div style="display:flex; gap:12px;">
+          <div class="input-group" style="flex:1;">
+            <label>Start Time</label>
+            <input type="time" id="shift-start" class="input-field" required value="19:00">
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>End Time</label>
+            <input type="time" id="shift-end" class="input-field" required value="04:00">
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Grace Period (Minutes)</label>
+          <input type="number" id="shift-grace" class="input-field" required value="15">
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeShiftModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Shift</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Quick Payroll & Quota Edit Modal -->
+  <div class="modal-overlay" id="payroll-edit-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="payroll-modal-title"><i class="fa-solid fa-sliders" style="color:var(--primary);"></i> Edit Employee Quota & Probation</h3>
+        <button class="modal-close" onclick="closePayrollEditModal()">&times;</button>
+      </div>
+      <form id="payroll-edit-form" onsubmit="savePayrollQuota(event)">
+        <input type="hidden" id="payroll-edit-emp-id">
+        <div class="input-group">
+          <label>Employee Name</label>
+          <input type="text" id="payroll-edit-emp-name" class="input-field" readonly style="opacity:0.75; cursor:not-allowed;">
+        </div>
+        <div style="display:flex; gap:12px;">
+          <div class="input-group" style="flex:1;">
+            <label>Annual Free Quota (Days / Year)</label>
+            <input type="number" id="payroll-edit-quota" class="input-field" step="0.5" min="0" required placeholder="e.g. 3.0 or 24.0" oninput="updatePayrollEditPreview()">
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>Total Leaves Used So Far (Days)</label>
+            <input type="number" id="payroll-edit-total-used" class="input-field" step="0.25" min="0" required placeholder="e.g. 2.0 or 5.0" oninput="updatePayrollEditPreview()">
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Base Salary (PKR)</label>
+          <input type="number" id="payroll-edit-salary" class="input-field" required placeholder="e.g. 60000">
+        </div>
+        <div id="payroll-edit-preview" style="font-size:13px; font-weight:700; color:var(--success); background:rgba(16, 185, 129, 0.1); padding:10px 12px; border-radius:8px; border-left:3px solid var(--success); margin-bottom:16px;"></div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closePayrollEditModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save & Recalculate</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Printable Monthly Payslip Modal -->
+  <div class="modal-overlay" id="payslip-modal">
+    <div class="modal-box" style="max-width: 850px; max-height: 90vh; overflow-y: auto;">
+      <div class="modal-header">
+        <h3 id="payslip-modal-title"><i class="fa-solid fa-file-invoice-dollar" style="color:var(--primary);"></i> Monthly Employee Salary Slips</h3>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="btn btn-primary" onclick="printPayslips()"><i class="fa-solid fa-print"></i> Print / Save PDF</button>
+          <button class="modal-close" onclick="closePayslipModal()">&times;</button>
+        </div>
+      </div>
+      <div id="payslips-printable-area"></div>
+    </div>
+  </div>
+
+  <script src="app.js?v=1.1.0"></script>
+</body>
+</html>
+
+
+
+
